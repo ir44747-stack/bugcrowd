@@ -1,0 +1,13 @@
+{
+  "scope": [
+    "example.com",
+    "api.example.com",
+    "*.example.com"
+  ],
+  "files_scanned": 1,
+  "endpoints": [
+    "/api/users"
+  ],
+  "subdomains": [],
+  "compliance": "AGENTS_RULES.md: No blind scanning, passive only, filtered locally, scope adhered"
+}

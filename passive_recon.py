@@ -129,7 +129,7 @@ def analyze_js_directory(js_dir: Path, scope_list: List[str]) -> dict:
         print(f"[!] Directory not found: {js_dir}")
         return results
 
-    root_domain = scope_list[0].lstrip('*.'). if scope_list else ""
+    root_domain = scope_list[0].lstrip('*.').lstrip('.') if scope_list else ""
 
     for js_file in js_dir.rglob("*.js"):
         try:
@@ -215,7 +215,7 @@ def main():
 
     scope_list = DEFAULT_SCOPE
     if args.scope_file:
-        scope_list = [line.strip() for line in Path(args.scope_file).read_text().splitlines() if line.strip()]
+        scope_list = [line.strip() for line in Path(args.scope_file).read_text().splitlines() if line.strip() and not line.strip().startswith('#')]
 
     print(f"[*] Scope: {scope_list}")
     print(f"[*] Rule 1: No blind scanning - passive only")
