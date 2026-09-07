@@ -1,0 +1,33 @@
+{
+  "safety": {
+    "note": "All values enforce AGENTS_RULES.md - do not lower rate limits",
+    "delay_seconds": 2.0,
+    "jitter_seconds": 0.5,
+    "timeout_seconds": 10,
+    "max_requests_per_endpoint": 10,
+    "max_params_to_test": 10,
+    "allowed_methods": ["GET", "HEAD", "OPTIONS"],
+    "require_scope": true,
+    "require_confirm_authorized": true
+  },
+  "parameter_discovery": {
+    "note": "Small safe list - NOT a brute-force wordlist. Purpose is to detect accepted param names only.",
+    "common_params_safe": [
+      "id", "page", "limit", "offset", "sort", "order", "q", "search",
+      "lang", "locale", "format", "callback", "api_key", "token",
+      "user_id", "account_id", "debug", "test", "verbose", "fields",
+      "include", "exclude", "filter", "view", "type", "status"
+    ],
+    "test_value": "1",
+    "interesting_status_codes": [200, 400, 422]
+  },
+  "headers": {
+    "User-Agent": "BugBounty-Framework/1.0 (Authorized Testing; Rate-Limited; Contact: security-researcher)",
+    "Accept": "application/json, text/plain, */*"
+  },
+  "logging": {
+    "truncate_body_preview": 500,
+    "save_full_headers": true,
+    "save_differential_analysis": true
+  }
+}
