@@ -1,0 +1,5 @@
+# Passive Recon Module - Minimal dependencies
+# Core module uses only Python standard library for local JS analysis
+# requests is only needed if you enable --use-ct (Certificate Transparency passive enum)
+
+requests>=2.31.0
