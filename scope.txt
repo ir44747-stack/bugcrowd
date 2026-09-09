@@ -1,22 +1,2 @@
-# scope.txt - Define authorized scope (Rule 4: Scope Adherence)
-# One domain per line. Supports wildcard via base domain matching.
-# This file is checked by passive_recon.py - any finding outside this list is dropped.
-#
-# IMPORTANT: Replace these examples with your actual Bugcrowd / HackerOne program scope
-# Always verify scope from the official program page before running.
-
-# Primary domains
-example.com
-api.example.com
-
-# Wildcard - module will allow *.example.com (any subdomain of example.com)
-*.example.com
-
-# Add additional in-scope assets below:
-# staging.example.com
-# assets.example.com
-# example.io
-
-# Out-of-scope examples (DO NOT add - listed here for reference only):
-# ! other-company.com
-# ! *.google.com
+minly.com
+*.minly.com
