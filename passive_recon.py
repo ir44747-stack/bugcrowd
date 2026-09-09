@@ -15,6 +15,7 @@ Rule 3 - False Positive Filtering: All findings are filtered locally before outp
 Rule 4 - Scope Adherence: Every finding is checked against an explicit allow-list.
 """
 
+import os
 import re
 import json
 import argparse
@@ -122,37 +123,52 @@ def extract_subdomains_from_js(js_content: str, root_domain: str) -> Set[str]:
 
 
 def analyze_js_directory(js_dir: Path, scope_list: List[str]) -> dict:
-    """Analyze all .js files locally - no requests to target."""
+    """Analyze all .js files locally - comprehensive recursive search using os.walk('.')"""
     results = {"endpoints": set(), "subdomains": set(), "files_scanned": 0}
-
-    if not js_dir.exists():
-        print(f"[!] Directory not found: {js_dir}")
-        return results
 
     root_domain = scope_list[0].lstrip('*.').lstrip('.') if scope_list else ""
 
-    for js_file in js_dir.rglob("*.js"):
-        try:
-            content = js_file.read_text(encoding='utf-8', errors='ignore')
-            results["files_scanned"] += 1
+    # Per request: comprehensive recursive search for all .js files in current dir and subdirs using os.walk('.')
+    # This ensures files in root (e.g., test.js) are processed, not just rigid js_files/ folder
+    search_base = "."  # Always search from current directory recursively as requested
+    # If user explicitly provided a different existing directory, honor it as base, otherwise use "."
+    if js_dir.exists() and str(js_dir) != ".":
+        # If js_dir is provided (e.g., ./js_files), we still want comprehensive search from "." per request
+        # So we will walk from "." to include root files like test.js AND js_files/
+        # To respect the request fully, we use os.walk('.') regardless
+        search_base = "."
 
-            endpoints = extract_endpoints_from_js(content)
-            # Apply scope filter for absolute URLs
-            for ep in endpoints:
-                if ep.startswith("http"):
-                    if is_in_scope(ep, scope_list):
-                        results["endpoints"].add(ep)
-                else:
-                    # Relative paths are kept - they are in-scope by definition if JS is in-scope
-                    results["endpoints"].add(ep)
+    print(f"[*] Searching for .js files recursively using os.walk('{search_base}') - comprehensive search")
 
-            subs = extract_subdomains_from_js(content, root_domain)
-            for s in subs:
-                if is_in_scope(s, scope_list):
-                    results["subdomains"].add(s)
+    for root, dirs, files in os.walk(search_base):
+        # Skip noisy / irrelevant directories to keep filtering clean (Rule 3)
+        # Keep js_files, but skip .git, caches, venvs, etc.
+        dirs[:] = [d for d in dirs if d not in {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'env', 'dist', 'build', '.github', 'clean_results', 'probe_results'}]
+        
+        for file in files:
+            if file.endswith('.js'):
+                js_file_path = Path(root) / file
+                try:
+                    content = js_file_path.read_text(encoding='utf-8', errors='ignore')
+                    results["files_scanned"] += 1
 
-        except Exception as e:
-            print(f"[!] Error reading {js_file}: {e}")
+                    endpoints = extract_endpoints_from_js(content)
+                    # Apply scope filter for absolute URLs
+                    for ep in endpoints:
+                        if ep.startswith("http"):
+                            if is_in_scope(ep, scope_list):
+                                results["endpoints"].add(ep)
+                        else:
+                            # Relative paths are kept - they are in-scope by definition if JS is in-scope
+                            results["endpoints"].add(ep)
+
+                    subs = extract_subdomains_from_js(content, root_domain)
+                    for s in subs:
+                        if is_in_scope(s, scope_list):
+                            results["subdomains"].add(s)
+
+                except Exception as e:
+                    print(f"[!] Error reading {js_file_path}: {e}")
 
     return results
 
