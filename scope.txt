@@ -1,2 +1,6 @@
+# scope.txt - Authorized scope (Rule 4: Scope Adherence)
+# Minly.com - Real program scope
+# Updated: 2026-09-09
+
 minly.com
 *.minly.com
