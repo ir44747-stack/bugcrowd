@@ -1,0 +1,105 @@
+name: Tortoise Pipeline - Minly Scope
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '**.py'
+      - 'scope.txt'
+      - 'requirements.txt'
+      - '.github/workflows/tortoise_pipeline.yml'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  tortoise-recon:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          echo "Installed dependencies"
+
+      - name: Verify scope (Minly)
+        run: |
+          echo "=== scope.txt (must be minly.com only per Rule 4) ==="
+          cat scope.txt
+          if ! grep -q "minly.com" scope.txt; then
+            echo "::error::scope.txt does not contain minly.com - aborting for Rule 4 compliance"
+            exit 1
+          fi
+
+      - name: Prepare JS input directory
+        run: |
+          mkdir -p js_files
+          # If no JS files committed, create placeholder to allow pipeline to run
+          if [ -z "$(ls -A js_files/*.js 2>/dev/null)" ]; then
+            echo "// Placeholder - add real collected JS files to js_files/ for real runs" > js_files/placeholder.js
+            echo "No JS files found - created placeholder.js for pipeline validation"
+          fi
+          ls -lh js_files/
+
+      - name: Stage 1 - Passive Recon (AGENTS_RULES.md compliant)
+        run: |
+          echo "Running passive_recon.py with minly.com scope - no active scanning"
+          python3 passive_recon.py --js-dir ./js_files --scope-file scope.txt
+          echo "=== passive_recon_results.json ==="
+          cat passive_recon_results.json
+
+      - name: Stage 2 - Advanced Filtering & Categorization
+        run: |
+          echo "Running advanced_filter.py - strict blacklist + scope validation"
+          python3 advanced_filter.py --input passive_recon_results.json --scope-file scope.txt --output-dir ./clean_results
+          echo "=== Clean Results ==="
+          ls -R clean_results/
+          echo "--- endpoints_clean.txt ---"
+          cat clean_results/endpoints_clean.txt || echo "(empty)"
+          echo "--- subdomains_clean.txt ---"
+          cat clean_results/subdomains_clean.txt || echo "(empty)"
+
+      - name: Stage 3 - Targeted Probing (Dry-Run Only in CI)
+        run: |
+          echo "Running targeted_probe.py --dry-run - NO live traffic in CI (Rule 1)"
+          python3 targeted_probe.py --input clean_results/clean_results.json --scope-file scope.txt --dry-run
+          # Also test with absolute URL list if present
+          if [ -f clean_results/endpoints_clean.txt ]; then
+            echo "Dry-run with flat list:"
+            python3 targeted_probe.py --endpoints-file clean_results/endpoints_clean.txt --scope-file scope.txt --dry-run || true
+          fi
+
+      - name: Upload pipeline artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tortoise-results-minly
+          path: |
+            passive_recon_results.json
+            clean_results/
+            js_files/
+          retention-days: 14
+
+      - name: Summary
+        run: |
+          echo "### Tortoise Pipeline Complete - Minly Scope" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scope:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat scope.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Stage 1 - Passive Recon:** $(cat passive_recon_results.json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(f\"{len(d.get(\"endpoints\",[]))} endpoints, {len(d.get(\"subdomains\",[]))} subdomains\")')" >> $GITHUB_STEP_SUMMARY
+          echo "**Stage 2 - Clean:** $(ls clean_results/ | wc -l) files in clean_results/" >> $GITHUB_STEP_SUMMARY
+          echo "**Stage 3 - Probing:** Dry-run only (no live traffic in CI per AGENTS_RULES.md Rule 1)" >> $GITHUB_STEP_SUMMARY
